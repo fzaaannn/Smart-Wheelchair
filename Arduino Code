@@ -1,0 +1,192 @@
+#include <Servo.h>
+#include <Adafruit_MotorShield.h>
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *M1 = AFMS.getMotor(1);
+Adafruit_DCMotor *M2 = AFMS.getMotor(2);
+
+
+#define Echo A0
+#define Trig A1
+#define motor 10
+#define Speed 100
+#define spoint 103
+char value;
+int distance;
+int Left;
+int Right;
+int L = 0;
+int R = 0;
+int L1 = 0;
+int R1 = 0;
+Servo servo;
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Adafruit Motorshield v2 - DC Motor test!");
+
+  AFMS.begin(); 
+  Serial.println("Motor Shield found.");
+
+  pinMode(Trig, OUTPUT);
+  pinMode(Echo, INPUT);
+  servo.attach(motor);
+  M1->setSpeed(150);
+  M2->setSpeed(150);
+}
+  
+void loop() {
+
+  Bluetoothcontrol();
+  voicecontrol();
+  Obstacle1();
+}
+void Bluetoothcontrol() {
+  Serial.println("code reached");
+  if (Serial.available() > 0) {
+    value = Serial.read();
+    Serial.println("value "+value);
+  }
+
+  if (value == 'B') {
+    forward();
+  } else if (value == 'F') {
+    backward();
+  } else if (value == 'L') {
+    left();
+  } else if (value == 'R') {
+    right();
+  } else if (value == 'S') {
+    Stop();
+  }
+  else{
+    Stop();
+  }
+}
+// else if(value == 'D'){
+//   Stop();
+// }
+// }
+
+
+void forward() {
+  M1->run(FORWARD);
+  M2->run(FORWARD);
+}
+void backward() {
+  M1->run(BACKWARD);
+  M2->run(BACKWARD);
+}
+void right() {
+  M2->run(BACKWARD);
+  M1->run(FORWARD);
+}
+void left() {
+  M2->run(FORWARD);
+  M1->run(BACKWARD);
+}
+void Stop() {
+  M1->run(RELEASE);
+  M2->run(RELEASE);
+}
+void Obstacle1() {
+  distance = ultrasonic();
+  Serial.println(distance);
+  if (distance <= 20) {
+    Stop();
+    delay(100);
+    // Look right (90 degrees)
+    servo.write(0);
+    delay(500);
+    int rightDistance = ultrasonic();
+    servo.write(spoint);  // Reset servo position
+
+    if (rightDistance < 20) {  // No obstacle on the right
+      delay(500);
+      right();
+      delay(500);
+      Stop();
+
+
+      //LED ON
+
+    } else {  // Obstacle detected on the right
+      // Look left (130 degrees)
+      servo.write(180);
+      int leftDistance = ultrasonic();
+      servo.write(spoint);  // Reset servo position
+
+      if (leftDistance <= 20) {  // No obstacle on the left
+        delay(500);
+        left();
+        delay(1000);
+        Stop();
+
+      } else {  // Obstacle detected on the left as well
+        delay(500);
+
+        right();
+        delay(1500);
+        Stop();
+      }
+    }
+  } else {
+    Stop();
+  }
+}
+
+void voicecontrol() {
+  if (Serial.available() > 0) {
+    value = Serial.read();
+    Serial.println(value);
+    if (value == '^') {
+      forward();
+    } else if (value == '-') {
+      backward();
+    } else if (value == '<') {
+      L = leftsee();
+      servo.write(spoint);
+      if (L >= 10) {
+        left();
+        delay(500);
+        Stop();
+      } else if (L < 10) {
+        Stop();
+      }
+    } else if (value == '>') {
+      R = rightsee();
+      servo.write(spoint);
+      if (R >= 10) {
+        right();
+        delay(500);
+        Stop();
+      } else if (R < 10) {
+        Stop();
+      }
+    } else if (value == '*') {
+      Stop();
+    }
+  }
+}
+// Ultrasonic sensor distance reading function
+int ultrasonic() {
+  digitalWrite(Trig, LOW);
+  delayMicroseconds(4);
+  digitalWrite(Trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(Trig, LOW);
+  long t = pulseIn(Echo, HIGH);
+  long cm = t / 29 / 2;  //time convert distance
+  return cm;
+}
+
+int rightsee() {
+  servo.write(20);
+  delay(800);
+  Left = ultrasonic();
+  return Left;
+}
+int leftsee() {
+  servo.write(180);
+  delay(800);
+  Right = ultrasonic();
+  return Right;
+}
