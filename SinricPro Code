@@ -1,0 +1,112 @@
+#ifdef ENABLE_DEBUG
+  #define DEBUG_ESP_PORT Serial
+  #define NODEBUG_WEBSOCKETS
+  #define NDEBUG
+#endif
+
+#include <Arduino.h>
+#ifdef ESP8266
+  #include <ESP8266WiFi.h>
+#endif
+#ifdef ESP32
+  #include <WiFi.h>
+#endif
+
+#include <SinricPro.h>
+#include "Wheelchair.h"
+#include <Wire.h>
+#define APP_KEY    "c8dfbbfb-a2b8-4c40-8037-52703cfcffc3"
+#define APP_SECRET "3f7df0ab-9827-4407-8461-6cee82f96228-5b984352-3ed0-414a-a291-70127297bee5"
+#define DEVICE_ID  "6653217e6e1af35935fc93e6"
+
+#define SSID       "I"
+#define PASS       "isarahmad"
+
+#define BAUD_RATE  9600
+
+Wheelchair &wheelchair = SinricPro[DEVICE_ID];
+
+/*****
+ * Variables *
+ *****************
+ * Global variables to store the device states *
+ *****************/
+
+// ModeController
+std::map<String, String> globalModes;
+
+/*****
+ * Callbacks *
+ *****/
+
+// ModeController
+bool onSetMode(const String& deviceId, const String& instance, String &mode) {
+  Serial.printf("[Device: %s]: Modesetting for \"%s\" set to mode %s\r\n", deviceId.c_str(), instance.c_str(), mode.c_str());
+  globalModes[instance] = mode;
+
+   Wire.beginTransmission(8); /* begin with device address 8 */
+  Wire.write(mode.c_str());  /* sends hello string */
+   Wire.endTransmission(); 
+  return true;
+}
+
+/****
+ * Events *
+ *****************
+ * Examples how to update the server status when *
+ * you physically interact with your device or a *
+ * sensor reading changes.                       *
+ *****************/
+
+// ModeController
+void updateMode(String instance, String mode) {
+  wheelchair.sendModeEvent(instance, mode, "PHYSICAL_INTERACTION");
+}
+
+/*** 
+ * Setup *
+ ***/
+
+void setupSinricPro() {
+
+  // ModeController
+  wheelchair.onSetMode("modeInstance1", onSetMode);
+
+
+  SinricPro.onConnected([]{ Serial.printf("[SinricPro]: Connected\r\n"); });
+  SinricPro.onDisconnected([]{ Serial.printf("[SinricPro]: Disconnected\r\n"); });
+  SinricPro.begin(APP_KEY, APP_SECRET);
+};
+
+void setupWiFi() {
+  #if defined(ESP8266)
+    WiFi.setSleepMode(WIFI_NONE_SLEEP); 
+    WiFi.setAutoReconnect(true);
+  #elif defined(ESP32)
+    WiFi.setSleep(false); 
+    WiFi.setAutoReconnect(true);
+  #endif
+
+  WiFi.begin(SSID, PASS);
+  Serial.printf("[WiFi]: Connecting to %s", SSID);
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.printf(".");
+    delay(250);
+  }
+  Serial.printf("connected\r\n");
+}
+
+void setup() {
+  Serial.begin(BAUD_RATE);
+  Wire.begin(D1, D2);
+  setupWiFi();
+  setupSinricPro();
+}
+
+/****
+ * Loop *
+ ****/
+
+void loop() {
+  SinricPro.handle();
+}
